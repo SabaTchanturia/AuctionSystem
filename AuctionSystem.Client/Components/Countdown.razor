@@ -1,0 +1,46 @@
+﻿<span>@display</span>
+
+@code {
+    [Parameter] public DateTime EndUtc { get; set; }
+
+    private string display = "";
+    private CancellationTokenSource? cts;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        cts?.Cancel();
+        cts = new CancellationTokenSource();
+
+        await RunAsync(cts.Token);
+    }
+
+    private async Task RunAsync(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            var now = DateTime.UtcNow;
+            var remaining = EndUtc - now;
+
+            if (remaining <= TimeSpan.Zero)
+            {
+                display = "Ended";
+                StateHasChanged();
+                break;
+            }
+
+            var d = remaining.Days;
+            var h = remaining.Hours;
+            var m = remaining.Minutes;
+            var s = remaining.Seconds;
+
+            display = (d > 0)
+                ? $"{d}d {h}h {m}m {s}s"
+                : $"{h}h {m}m {s}s";
+
+            StateHasChanged();
+            try { await Task.Delay(1000, token); } catch { break; }
+        }
+    }
+
+    public void Dispose() => cts?.Cancel();
+}

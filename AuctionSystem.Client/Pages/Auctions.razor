@@ -1,0 +1,61 @@
+﻿@page "/auctions"
+@using AuctionSystem.Client.Models
+@inject AuctionSystem.Client.Services.ApiClient Api
+
+<h3 class="mb-3">Auctions</h3>
+
+@if (items is null)
+{
+    <p>Loading...</p>
+}
+else if (items.Count == 0)
+{
+    <div class="alert alert-info">No auctions yet.</div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var a in items)
+        {
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title">@a.Make @a.Model @a.Year</h5>
+                        <div class="mb-2 text-muted">@a.Title</div>
+
+                        <div class="mb-2">
+                            <span class="badge bg-primary">Current: @a.CurrentPrice</span>
+                        </div>
+
+                        <div class="mb-2">
+                            <strong>Ends in:</strong>
+                            <AuctionSystem.Client.Components.Countdown EndUtc="@a.EndDate" />
+                        </div>
+
+                        @if (a.WinnerId is not null)
+                        {
+                            <div class="mb-2">
+                                <span class="badge bg-success">
+                                    Leading: @(a.Winner?.Username ?? $"User {a.WinnerId}")
+                                </span>
+                            </div>
+                        }
+
+                        <div class="mt-auto">
+                            <a href="@($"/auction/{a.Id}")" class="btn btn-outline-primary w-100">Open</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    List<AuctionDto>? items;
+
+    protected override async Task OnInitializedAsync()
+    {
+        items = await Api.GetJson<List<AuctionDto>>("api/Auctions") ?? new();
+    }
+}

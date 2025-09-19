@@ -1,0 +1,167 @@
+﻿@page "/create"
+@using AuctionSystem.Client.Models
+@using Microsoft.AspNetCore.Components.Forms
+@inject AuctionSystem.Client.Services.ApiClient Api
+@inject AuctionSystem.Client.Services.AuthService Auth
+@inject NavigationManager Nav
+
+<h3>Create Auction (Car)</h3>
+
+@if (!Auth.IsAuthenticated)
+{
+    <div class="alert alert-warning">
+        Please login to create an auction.
+    </div>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="OnSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Make *</label>
+                <InputText class="form-control" @bind-Value="model.Make" />
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">Model *</label>
+                <InputText class="form-control" @bind-Value="model.Model" />
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Year *</label>
+                <InputNumber class="form-control" @bind-Value="model.Year" />
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Start Price *</label>
+                <InputNumber class="form-control" @bind-Value="model.StartPrice" />
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">End Date (local) *</label>
+                <!-- datetime-local best via InputText -->
+                <InputText class="form-control" @bind-Value="endLocal" type="datetime-local" />
+                <small class="text-muted">Will be converted to UTC on submit</small>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">VIN</label>
+                <InputText class="form-control" @bind-Value="model.Vin" />
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">Mileage (km)</label>
+                <InputNumber class="form-control" @bind-Value="model.MileageKm" />
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">Title (optional)</label>
+                <InputText class="form-control" @bind-Value="model.Title" placeholder="Toyota Corolla 2016" />
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">Description</label>
+                <InputTextArea class="form-control" rows="3" @bind-Value="model.Description" />
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <button class="btn btn-primary" type="submit" disabled="@isBusy">Create</button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(msg))
+        {
+            <div class="mt-3 alert @(isError ? "alert-danger" : "alert-success")">@msg</div>
+        }
+    </EditForm>
+}
+
+@code {
+    CreateAuctionDto model = new();
+    bool isBusy = false;
+    string? msg;
+    bool isError = false;
+
+    string endLocal = DateTime.UtcNow.AddDays(2).ToString("yyyy-MM-ddTHH:mm");
+
+    protected override async Task OnInitializedAsync()
+    {
+        // დამაზღვევად – ჩატვირთე token თუ უკვე იყო შენახული
+        await Auth.InitializeAsync();
+
+        if (!Auth.IsAuthenticated)
+        {
+            var path = Nav.ToBaseRelativePath(Nav.Uri);
+            if (string.IsNullOrWhiteSpace(path)) path = "create";
+            // → /login?returnUrl=/create
+            Nav.NavigateTo($"/login?returnUrl=/{Uri.EscapeDataString(path)}", forceLoad: true);
+            return;
+        }
+
+        model.Year = DateTime.UtcNow.Year;
+        model.StartPrice = 0;
+        model.Vin = "";
+    }
+
+    private async Task OnSubmit()
+    {
+        msg = null; isError = false;
+
+        try
+        {
+            if (!Auth.IsAuthenticated)
+            {
+                msg = "Please login first.";
+                isError = true;
+                return;
+            }
+
+            if (DateTime.TryParse(endLocal, out var localDt))
+            {
+                var utc = DateTime.SpecifyKind(localDt, DateTimeKind.Local).ToUniversalTime();
+                model.EndDate = utc;
+            }
+            else
+            {
+                msg = "Invalid end date.";
+                isError = true;
+                return;
+            }
+
+            if (model.EndDate <= DateTime.UtcNow)
+            {
+                msg = "End date must be in the future.";
+                isError = true;
+                return;
+            }
+
+            isBusy = true;
+            var resp = await Api.PostJson("api/Auctions", model);
+            if (resp.IsSuccessStatusCode)
+            {
+                msg = "Auction created ✅ Redirecting…";
+                isError = false;
+                await Task.Delay(600);
+                Nav.NavigateTo("/auctions", forceLoad: true);
+            }
+            else
+            {
+                var text = await resp.Content.ReadAsStringAsync();
+                msg = string.IsNullOrWhiteSpace(text) ? "Failed to create auction." : text;
+                isError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            msg = ex.Message;
+            isError = true;
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}

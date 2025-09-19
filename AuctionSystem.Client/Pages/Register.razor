@@ -1,0 +1,67 @@
+﻿@page "/register"
+@inject AuctionSystem.Client.Services.AuthService Auth
+@inject NavigationManager Nav
+
+<h3>Register</h3>
+
+<div class="mb-3">
+    <label>Username</label>
+    <input class="form-control" @bind="username" />
+</div>
+
+<div class="mb-3">
+    <label>Password</label>
+    <input class="form-control" type="password" @bind="password" />
+</div>
+
+<button class="btn btn-primary" @onclick="OnRegister" disabled="@isBusy">Register</button>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="mt-3 alert @(isError ? "alert-danger" : "alert-success")">@message</div>
+}
+
+@code {
+    string username = "";
+    string password = "";
+    string? message;
+    bool isError = false;
+    bool isBusy = false;
+
+    private async Task OnRegister()
+    {
+        message = null; isError = false; isBusy = true;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            {
+                message = "Please fill both fields.";
+                isError = true;
+                return;
+            }
+
+            var ok = await Auth.Register(username, password);
+            if (ok)
+            {
+                message = "User registered ✅ You can now login.";
+                isError = false;
+                await Task.Delay(500);
+                Nav.NavigateTo("/login");
+            }
+            else
+            {
+                message = "Registration failed.";
+                isError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+            isError = true;
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}
